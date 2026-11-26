@@ -1,0 +1,14 @@
+{
+  "name": "olho-port",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Um olho roxo brilhante que segue o mouse (WebGL com three.js).",
+  "scripts": {
+    "build": "esbuild src/olho.js --bundle --minify --format=iife --target=es2019 --outfile=js/olho.js",
+    "dev": "esbuild src/olho.js --bundle --sourcemap --format=iife --target=es2019 --outfile=js/olho.js --watch"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.0",
+    "three": "0.180.0"
+  }
+}

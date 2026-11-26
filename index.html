@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Olho</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #050009;
+        overflow: hidden;
+      }
+      #palco,
+      #palco canvas {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      /* escurece as bordas (o mesmo do Big Bang) */
+      #vinheta {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(ellipse at center, transparent 35%, rgba(12, 0, 30, 0.95) 100%);
+        opacity: 0.8;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="palco" role="img" aria-label="Um olho roxo brilhante"></div>
+    <div id="vinheta"></div>
+    <script src="js/olho.js"></script>
+  </body>
+</html>
