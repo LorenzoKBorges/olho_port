@@ -17,6 +17,10 @@ Também funciona em qualquer hospedagem estática (GitHub Pages, Netlify, Vercel
   voltam a seguir.
 - Cada um pisca a cada 8 a 10 segundos, no seu ritmo.
 - Em tela deitada eles se espalham pela tela; em tela em pé (celular), ficam numa coluna.
+- De vez em quando cada olho "falha" (glitch) por uma fração de segundo: as linhas se dividem numa
+  cópia azul e outra vermelho-escura, algumas faixas escorregam para o lado e tudo pisca.
+- Clicou (ou tocou) num olho: ele pisca vermelho, fica quase fechado por uns 5 segundos e depois
+  abre. Em cima de um olho o cursor vira a mãozinha.
 
 ## Como ele é feito
 
@@ -47,7 +51,7 @@ npm run dev
 
 | Arquivo | O quê |
 | --- | --- |
-| `src/olho.js` | O olho e a animação. No topo: `OLHO` (medidas, espessura das linhas, tamanho da fenda), `COR_OLHO` (cores das linhas), `VEU` (o quanto escurece por dentro), `ANIMACAO` (tempos: `voltarDepois`, `normalPor`, `piscarEntre`) e `ESPALHADOS` (posição, tamanho e inclinação de cada olho). |
+| `src/olho.js` | O olho e a animação. No topo: `OLHO` (medidas, espessura das linhas, tamanho da fenda), `COR_OLHO` (cores das linhas), `VEU` (o quanto escurece por dentro), `ANIMACAO` (tempos: `voltarDepois`, `normalPor`, `piscarEntre`), `EFEITOS` (cores e tempos da falha e do clique) e `ESPALHADOS` (posição, tamanho e inclinação de cada olho). |
 | `src/posprocesso.js` | Brilho difuso e a cor final da imagem (`COR`: mais escura, roxos mais fortes). |
 | `src/ceu.js` | O céu estrelado do fundo. |
 | `src/materiais.js` | Materiais das partículas e dos brilhos. |
