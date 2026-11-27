@@ -19,9 +19,9 @@ Também funciona em qualquer hospedagem estática (GitHub Pages, Netlify, Vercel
 
 - Contorno de luz lilás em forma de amêndoa, com um halo violeta em volta.
 - Fundo do olho roxo bem escuro, com uma névoa.
-- Íris de magenta a violeta, com fibras de luz e partículas brilhando que giram devagar, como uma galáxia.
-- Pupila preta como um buraco negro, com um anel fino de luz em volta.
-- Um brilho em forma de estrela na íris e um céu estrelado roxo no fundo.
+- Íris simples, em duas faixas de cor: magenta perto da pupila e violeta por fora.
+- Pupila transparente: é um furo, por onde se vê o céu estrelado do fundo.
+- Um brilho pequeno e suave na íris e um céu estrelado roxo no fundo.
 - Brilho difuso (bloom) e uma cor final mais escura, com roxos mais fortes.
 
 ## Mexendo no olho
