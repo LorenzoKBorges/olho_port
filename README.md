@@ -17,11 +17,11 @@ Também funciona em qualquer hospedagem estática (GitHub Pages, Netlify, Vercel
 
 ## Como ele é feito
 
-- Contorno de luz lilás em forma de amêndoa, com um halo violeta em volta.
-- Fundo do olho roxo bem escuro, com uma névoa.
-- Íris simples, em duas faixas de cor: magenta perto da pupila e violeta por fora.
-- Pupila transparente: é um furo, por onde se vê o céu estrelado do fundo.
-- Um brilho pequeno e suave na íris e um céu estrelado roxo no fundo.
+É um desenho feito de linhas de luz, sem cores por dentro:
+
+- As pálpebras são duas linhas lilás que se cruzam um pouco além das pontas, com um halo violeta em volta.
+- A íris é só o contorno de um círculo; a pupila, o contorno de uma fenda em pé (de gato), que abre e fecha devagar.
+- Por dentro o olho é transparente: vê-se o céu estrelado roxo através dele (só um véu escuro bem leve, ajustável em `VEU`).
 - Brilho difuso (bloom) e uma cor final mais escura, com roxos mais fortes.
 
 ## Mexendo no olho
@@ -44,7 +44,7 @@ npm run dev
 
 | Arquivo | O quê |
 | --- | --- |
-| `src/olho.js` | O olho e a animação. No topo: `OLHO` (medidas), `COR_OLHO` (cores) e `ANIMACAO` (tempos: `voltarDepois`, `normalPor`, `piscarEntre`). |
+| `src/olho.js` | O olho e a animação. No topo: `OLHO` (medidas, espessura das linhas, tamanho da fenda), `COR_OLHO` (cores das linhas), `VEU` (o quanto escurece por dentro) e `ANIMACAO` (tempos: `voltarDepois`, `normalPor`, `piscarEntre`). |
 | `src/posprocesso.js` | Brilho difuso e a cor final da imagem (`COR`: mais escura, roxos mais fortes). |
 | `src/ceu.js` | O céu estrelado do fundo. |
 | `src/materiais.js` | Materiais das partículas e dos brilhos. |

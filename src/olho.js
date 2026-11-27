@@ -8,16 +8,15 @@
  *  - pisca a cada 8 a 10 segundos (cada piscada um pouco diferente).
  * Os efeitos em volta do olho vêm na próxima etapa.
  *
- * Partes do olho:
- *  - contorno de amêndoa feito de luz lilás, com um halo violeta em volta;
- *  - o fundo do olho, roxo bem escuro com uma névoa;
- *  - a íris: duas faixas de cor (magenta perto da pupila, violeta por fora), bem simples;
- *  - a pupila: um furo transparente (vê-se o céu estrelado através dela);
- *  - um brilho pequeno e suave na íris.
+ * O olho é um desenho feito de luz (sem cores por dentro):
+ *  - as pálpebras são duas linhas de luz lilás que se cruzam um pouco além das pontas, com um halo
+ *    violeta em volta;
+ *  - por dentro o olho é transparente (só um véu escuro bem leve sobre o céu estrelado);
+ *  - a íris é só o contorno de um círculo e a pupila, o contorno de uma fenda em pé (de gato).
  */
 import * as THREE from 'three';
 import { criarTexturas } from './texturas.js';
-import { globais, sprite } from './materiais.js';
+import { globais } from './materiais.js';
 import { Ceu } from './ceu.js';
 import { criarPosProcesso, prepararRenderizador } from './posprocesso.js';
 
@@ -25,17 +24,19 @@ import { criarPosProcesso, prepararRenderizador } from './posprocesso.js';
 const OLHO = {
   meiaLargura: 11, // metade da largura da amêndoa
   meiaAltura: 5.2, // metade da altura (olho aberto)
-  raioIris: 4.7,
-  raioPupila: 1.65,
+  sobra: 1.1, // as linhas das pálpebras passam um pouco das pontas e se cruzam (como num desenho)
+  raioIris: 4.5,
+  fenda: { meiaAltura: 3.5, meiaLargura: 0.85 }, // a pupila é uma fenda em pé (olho de gato)
+  linha: 0.075, // espessura das linhas de luz
 };
 const COR_OLHO = {
-  contorno: '#e2ccff', // a linha de luz do contorno
+  contorno: '#e2ccff', // as pálpebras
+  iris: '#c9adff', // o círculo da íris
+  pupila: '#f1e6ff', // a fenda da pupila
   halo: '#7c3aed', // o brilho em volta do olho
-  fundo: ['#030008', '#120530'], // da borda para o meio do olho
-  irisDentro: '#ff45c8', // a faixa da íris perto da pupila
-  irisFora: '#7b4dff', // a faixa de fora
-  irisBorda: '#1c0a52', // a borda da íris
+  veu: '#06010f', // o olho por dentro é transparente, só um pouco mais escuro que o céu
 };
+const VEU = 0.35; // 0 = o céu aparece inteiro dentro do olho, 1 = o olho por dentro fica todo escuro
 
 const ANIMACAO = {
   voltarDepois: 7, // segundos com o ponteiro parado até o olho voltar a olhar para a frente
@@ -104,14 +105,15 @@ function materialOlho(uniforms, vertexShader, fragmentShader) {
 const cor3 = (h) => new THREE.Color(h);
 
 class Olho {
-  constructor(cena, tex) {
+  constructor(cena) {
     this.grupo = new THREE.Group();
     cena.add(this.grupo);
     const L = lente(OLHO.meiaLargura, OLHO.meiaAltura);
-    this.uComuns = { uLente: { value: L }, uDesloc: { value: 0 }, uT: { value: 0 } };
+    this.uComuns = { uLente: { value: L }, uDesloc: { value: 0 }, uT: { value: 0 }, uLinha: { value: OLHO.linha } };
     this.L = L;
 
-    // ---- contorno de luz, halo e o fundo do olho (um retângulo que cobre o olho e o halo)
+    // ---- pálpebras (duas linhas de luz que se cruzam nas pontas), halo e um véu bem leve por
+    //      dentro do olho (um retângulo que cobre o olho e o halo)
     const fundo = new THREE.Mesh(
       new THREE.PlaneGeometry(OLHO.meiaLargura * 2 + 16, OLHO.meiaAltura * 2 + 16),
       materialOlho(
@@ -119,44 +121,40 @@ class Olho {
           ...this.uComuns,
           uContorno: { value: cor3(COR_OLHO.contorno) },
           uHalo: { value: cor3(COR_OLHO.halo) },
-          uFundoBorda: { value: cor3(COR_OLHO.fundo[0]) },
-          uFundoMeio: { value: cor3(COR_OLHO.fundo[1]) },
-          uMeiaAltura: { value: OLHO.meiaAltura },
-          uPupila: { value: new THREE.Vector3(0, 0, OLHO.raioPupila) }, // centro (x, y) e raio
-          uEscalaPupila: { value: new THREE.Vector2(1, 1) },
+          uVeuCor: { value: cor3(COR_OLHO.veu) },
+          uVeu: { value: VEU },
+          uSobra: { value: OLHO.sobra },
         },
         /* glsl */ `
           varying vec2 vP;
           void main() { vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
         `,
         /* glsl */ `
-          uniform float uT; uniform vec3 uContorno; uniform vec3 uHalo; uniform vec3 uFundoBorda; uniform vec3 uFundoMeio;
-          uniform float uMeiaAltura; uniform vec3 uPupila; uniform vec2 uEscalaPupila;
+          uniform float uT; uniform vec3 uContorno; uniform vec3 uHalo; uniform vec3 uVeuCor; uniform float uVeu;
+          uniform float uSobra; uniform float uLinha;
           varying vec2 vP;
           ${GLSL_COMUM}
+          // uma pálpebra: arco de círculo (centro c, raio R) até um pouco além das pontas
+          float palpebra(vec2 p, vec2 c, float meiaLargura, float lado) {
+            float d = abs(length(p - c) - uLente.x);
+            float ate = 1.0 - smoothstep(meiaLargura + uSobra * 0.35, meiaLargura + uSobra, abs(p.x));
+            ate *= step(0.0, lado * (c.y - p.y)); // só o lado do arco que forma a pálpebra
+            return (exp(-pow(d / uLinha, 2.0)) + 0.16 * exp(-pow(d / (uLinha * 4.0), 2.0))) * ate;
+          }
           void main() {
             float sd = sdLente(vP);
             float dentro = 1.0 - smoothstep(-0.03, 0.03, sd);
-            // fundo do olho: escuro na borda, um pouco mais claro no meio, com uma névoa roxa
-            float prof = clamp(-sd / uMeiaAltura, 0.0, 1.0);
-            vec3 fundo = mix(uFundoBorda, uFundoMeio, smoothstep(0.0, 1.0, prof));
-            float nevoa = fbm(vec3(vP * 0.32, uT * 0.04));
-            fundo += uHalo * 0.16 * nevoa * nevoa * prof;
-            // sombra da pálpebra de cima
-            fundo *= 1.0 - 0.45 * smoothstep(0.0, uMeiaAltura, vP.y) * (1.0 - smoothstep(0.0, 1.6, -sd));
-            // contorno: uma linha fina e forte de luz, mais intensa nas pontas
-            float pontas = smoothstep(uLente.x - uLente.y - 5.0, uLente.x - uLente.y + 1.0, abs(vP.x));
+            vec2 p = vec2(vP.x, vP.y - uDesloc);
+            float meiaLargura = sqrt(max(uLente.x * uLente.x - uLente.y * uLente.y, 0.0));
             float pulso = 0.92 + 0.08 * sin(uT * 1.6);
-            float linha = exp(-pow(sd / 0.08, 2.0)) * (1.0 + 0.8 * pontas) * pulso;
-            float linhaLarga = exp(-pow(sd / 0.3, 2.0)) * 0.18;
+            // de baixo: círculo com centro acima; de cima: círculo com centro abaixo
+            float linhas = palpebra(p, vec2(0.0, uLente.y), meiaLargura, 1.0) + palpebra(p, vec2(0.0, -uLente.y), meiaLargura, -1.0);
             // halo violeta do lado de fora
             float fora = max(sd, 0.0);
-            float halo = (exp(-fora / 0.8) * 0.28 + exp(-fora / 3.5) * 0.09) * (1.0 - dentro);
-            vec3 brilho = uContorno * (linha + linhaLarga) + uHalo * halo * pulso;
-            // a pupila é um furo: ali o fundo do olho não cobre o céu
-            float furo = smoothstep(-0.04, 0.04, length((vP - uPupila.xy) / uEscalaPupila) - uPupila.z);
-            float cobre = dentro * furo;
-            gl_FragColor = vec4(fundo * cobre + brilho, cobre);
+            float halo = (exp(-fora / 0.8) * 0.24 + exp(-fora / 3.5) * 0.08) * (1.0 - dentro);
+            vec3 brilho = (uContorno * min(linhas, 1.4) + uHalo * halo) * pulso;
+            float veu = dentro * uVeu;
+            gl_FragColor = vec4(uVeuCor * veu + brilho, veu);
           }
         `
       )
@@ -165,18 +163,22 @@ class Olho {
     this.fundo = fundo;
     this.grupo.add(fundo);
 
-    // ---- íris (com a pupila) — pode se mover dentro do olho
+    // ---- íris e pupila: só os contornos (um círculo e uma fenda em pé), transparentes por dentro
     this.iris = new THREE.Group();
     this.grupo.add(this.iris);
     const lado = OLHO.raioIris * 2 + 1.5;
+    // a fenda também é uma amêndoa (em pé): pontas finas, como a pupila de um gato
+    const fenda = (meiaLargura) => {
+      const k = (OLHO.fenda.meiaAltura * OLHO.fenda.meiaAltura) / meiaLargura;
+      return new THREE.Vector2((k + meiaLargura) / 2, (k - meiaLargura) / 2);
+    };
+    this.fenda = fenda;
     this.uIris = {
       ...this.uComuns,
       uRi: { value: OLHO.raioIris },
-      uRp: { value: OLHO.raioPupila },
-      uDentro: { value: cor3(COR_OLHO.irisDentro) },
-      uFora: { value: cor3(COR_OLHO.irisFora) },
-      uBorda: { value: cor3(COR_OLHO.irisBorda) },
-      uMeiaAltura: this.fundo.material.uniforms.uMeiaAltura, // (o mesmo do fundo do olho)
+      uFenda: { value: fenda(OLHO.fenda.meiaLargura) },
+      uCorIris: { value: cor3(COR_OLHO.iris) },
+      uCorPupila: { value: cor3(COR_OLHO.pupila) },
     };
     const discoIris = new THREE.Mesh(
       new THREE.PlaneGeometry(lado, lado),
@@ -191,45 +193,30 @@ class Olho {
           }
         `,
         /* glsl */ `
-          uniform float uT; uniform float uRi; uniform float uRp;
-          uniform vec3 uDentro; uniform vec3 uFora; uniform vec3 uBorda; uniform float uMeiaAltura;
+          uniform float uT; uniform float uRi; uniform vec2 uFenda; uniform vec3 uCorIris; uniform vec3 uCorPupila;
+          uniform float uLinha;
           varying vec2 vP; varying vec2 vW;
           ${GLSL_COMUM}
+          // amêndoa em pé (a fenda da pupila): círculos de raio R com centros em x = +d e x = -d
+          float sdFenda(vec2 p) {
+            vec2 q = abs(p);
+            float b = sqrt(max(uFenda.x * uFenda.x - uFenda.y * uFenda.y, 0.0));
+            return ((q.y - b) * uFenda.y > q.x * b) ? length(q - vec2(0.0, b)) : length(q - vec2(-uFenda.y, 0.0)) - uFenda.x;
+          }
+          float traco(float d, float w) { return exp(-pow(d / w, 2.0)) + 0.16 * exp(-pow(d / (w * 4.0), 2.0)); }
           void main() {
-            float r = length(vP);
-            // a íris é um anel: por fora acaba na borda, por dentro tem o furo da pupila
-            float alfa = (1.0 - smoothstep(uRi - 0.04, uRi + 0.1, r)) * smoothstep(uRp - 0.04, uRp + 0.04, r);
-            if (alfa <= 0.0) discard;
-            alfa *= 1.0 - smoothstep(-0.06, 0.06, sdLente(vW)); // só dentro do olho
-            float x = clamp((r - uRp) / (uRi - uRp), 0.0, 1.0); // 0 na pupila, 1 na borda da íris
-            // duas faixas: magenta perto da pupila, violeta por fora (a divisa é suave);
-            // cada faixa é um pouco mais clara do lado de dentro
-            vec3 cor = mix(uDentro, uFora, smoothstep(0.34, 0.5, x));
-            float luz = x < 0.42 ? mix(1.0, 0.8, x / 0.42) : mix(1.0, 0.7, (x - 0.42) / 0.58);
-            // textura bem leve, girando devagar (para não ficar chapado)
-            float a = atan(vP.y, vP.x) + uT * 0.04;
-            luz *= 0.86 + 0.28 * fbm(vec3(cos(a) * 3.0, sin(a) * 3.0, r * 0.9));
-            cor *= luz * 0.85;
-            // borda da íris: escurece, com uma linha fina de luz por fora
-            cor = mix(cor, uBorda, smoothstep(0.84, 1.0, x));
-            cor += uFora * exp(-pow((r - uRi + 0.03) / 0.06, 2.0)) * 0.45;
-            // sombra da pálpebra de cima (dá profundidade)
-            float sd = sdLente(vW);
-            cor *= 1.0 - 0.4 * smoothstep(0.0, uMeiaAltura, vW.y) * (1.0 - smoothstep(0.0, 1.8, -sd));
-            gl_FragColor = vec4(cor * alfa, alfa);
+            float visivel = 1.0 - smoothstep(-0.08, 0.04, sdLente(vW)); // só dentro do olho
+            if (visivel <= 0.0) discard;
+            float iris = traco(abs(length(vP) - uRi), uLinha * 0.9);
+            float pupila = traco(abs(sdFenda(vP)), uLinha * 0.85);
+            vec3 cor = (uCorIris * iris * 0.85 + uCorPupila * pupila) * visivel;
+            gl_FragColor = vec4(cor, 0.0); // só luz: por dentro tudo é transparente
           }
         `
       )
     );
     discoIris.renderOrder = 11;
     this.iris.add(discoIris);
-
-    // ---- um brilho pequeno e suave na íris
-    this.reflexo = sprite(tex.brilho, '#fff0fb', 0.95, 0.8);
-    this.reflexo.position.set(-OLHO.raioIris * 0.45, OLHO.raioIris * 0.45, 0.1);
-    this.reflexo.renderOrder = 13;
-    this.reflexo.material.depthTest = false;
-    this.iris.add(this.reflexo);
   }
 
   /**
@@ -241,19 +228,13 @@ class Olho {
     // a íris vai para o lado e, vista de lado, fica um pouco achatada (o olho é redondo)
     this.iris.position.set(olharX * ANIMACAO.alcance.x, olharY * ANIMACAO.alcance.y, 0);
     this.iris.scale.set(1 - 0.12 * olharX * olharX, 1 - 0.1 * olharY * olharY, 1);
-    // a pupila respira um pouco; o furo no fundo do olho acompanha a íris
-    const rp = OLHO.raioPupila * (1 + 0.03 * Math.sin(t * 0.8));
-    this.uIris.uRp.value = rp;
-    this.fundo.material.uniforms.uPupila.value.set(this.iris.position.x, this.iris.position.y, rp);
-    this.fundo.material.uniforms.uEscalaPupila.value.set(this.iris.scale.x, this.iris.scale.y);
+    // a fenda da pupila abre e fecha um pouco, devagar
+    this.uIris.uFenda.value.copy(this.fenda(OLHO.fenda.meiaLargura * (1 + 0.18 * Math.sin(t * 0.7))));
     // piscar: a amêndoa fecha (mais a pálpebra de cima, então fecha um pouco abaixo do meio)
     const meiaAltura = Math.max(0.06, OLHO.meiaAltura * abertura);
     const k = (OLHO.meiaLargura * OLHO.meiaLargura) / meiaAltura;
     this.L.set((k + meiaAltura) / 2, (k - meiaAltura) / 2);
     this.uComuns.uDesloc.value = -(1 - abertura) * OLHO.meiaAltura * 0.3;
-    this.fundo.material.uniforms.uMeiaAltura.value = meiaAltura;
-    const visivel = THREE.MathUtils.smoothstep(abertura, 0.35, 0.75); // o brilho some ao fechar
-    this.reflexo.material.opacity = 0.8 * (0.9 + 0.1 * Math.sin(t * 2.3)) * visivel;
   }
 }
 
@@ -270,7 +251,7 @@ const cena = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 9000);
 const tex = criarTexturas();
 const ceu = new Ceu(cena, tex, fraco ? 0.5 : 1);
-const olho = new Olho(cena, tex);
+const olho = new Olho(cena);
 // (o brilho difuso só pega o que é bem claro: senão a íris inteira vira uma mancha)
 const { composer, bloom } = criarPosProcesso(renderer, cena, camera, { bloom: [0.6, 0.28, 0.6] });
 
