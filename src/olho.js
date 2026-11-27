@@ -62,8 +62,8 @@ const ESPALHADOS = {
     [0.4, -0.36, 0.74, -5],
     [-0.36, -0.72, 0.8, 8],
   ],
-  maiorDeitada: 0.3, // largura do maior olho, em fração da largura da tela (tela deitada)
-  maiorEmPe: 0.5, // (tela em pé)
+  maiorDeitada: 0.21, // largura do maior olho, em fração da largura da tela (tela deitada)
+  maiorEmPe: 0.4, // (tela em pé)
 };
 
 // a amêndoa é a interseção de dois círculos (raio R, centros em y = +d e y = -d)
@@ -173,6 +173,9 @@ class Olho {
             // halo violeta do lado de fora
             float fora = max(sd, 0.0);
             float halo = (exp(-fora / 0.8) * 0.24 + exp(-fora / 3.5) * 0.08) * (1.0 - dentro);
+            // o halo vai a zero antes da borda do retângulo onde é desenhado (senão aparece um
+            // "quadrado" de luz fraquinha em volta de cada olho)
+            halo *= 1.0 - smoothstep(4.0, 7.5, fora);
             vec3 brilho = (uContorno * min(linhas, 1.4) + uHalo * halo) * pulso;
             float veu = dentro * uVeu;
             gl_FragColor = vec4(uVeuCor * veu + brilho, veu);
@@ -234,6 +237,7 @@ class Olho {
             float iris = traco(abs(length(vP) - uRi), uLinha * 0.9);
             float pupila = traco(abs(sdFenda(vP)), uLinha * 0.85);
             vec3 cor = (uCorIris * iris * 0.85 + uCorPupila * pupila) * visivel;
+            cor *= 1.0 - smoothstep(uRi + 0.35, uRi + 0.7, length(vP)); // (zero antes da borda do quadrado)
             gl_FragColor = vec4(cor, 0.0); // só luz: por dentro tudo é transparente
           }
         `
