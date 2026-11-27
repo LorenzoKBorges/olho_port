@@ -1,6 +1,6 @@
 # Olho
 
-Um olho roxo brilhante que segue o mouse, em 3D (WebGL com [three.js](https://threejs.org/)).
+Cinco olhos roxos brilhantes, espalhados pela tela, que seguem o mouse (WebGL com [three.js](https://threejs.org/)).
 
 ## Como ver
 
@@ -10,10 +10,13 @@ Também funciona em qualquer hospedagem estática (GitHub Pages, Netlify, Vercel
 
 ## O que ele faz
 
-- Segue o mouse (ou o dedo, no celular). Com o ponteiro longe, olha até o canto; perto, mexe menos.
-- Se o ponteiro fica parado por 7 segundos, ele volta a olhar para a frente, fica assim uns 3
-  segundos e depois começa a olhar para lugares aleatórios. Assim que o ponteiro mexe, volta a seguir.
-- Pisca a cada 8 a 10 segundos.
+- Cada olho segue o mouse (ou o dedo, no celular) a partir de onde está: todos olham para o ponteiro.
+  Com o ponteiro longe, olham até o canto; perto, mexem menos.
+- Se o ponteiro fica parado por 7 segundos, todos voltam a olhar para a frente, ficam assim uns 3
+  segundos e depois cada um começa a olhar para lugares aleatórios. Assim que o ponteiro mexe,
+  voltam a seguir.
+- Cada um pisca a cada 8 a 10 segundos, no seu ritmo.
+- Em tela deitada eles se espalham pela tela; em tela em pé (celular), ficam numa coluna.
 
 ## Como ele é feito
 
@@ -44,7 +47,7 @@ npm run dev
 
 | Arquivo | O quê |
 | --- | --- |
-| `src/olho.js` | O olho e a animação. No topo: `OLHO` (medidas, espessura das linhas, tamanho da fenda), `COR_OLHO` (cores das linhas), `VEU` (o quanto escurece por dentro) e `ANIMACAO` (tempos: `voltarDepois`, `normalPor`, `piscarEntre`). |
+| `src/olho.js` | O olho e a animação. No topo: `OLHO` (medidas, espessura das linhas, tamanho da fenda), `COR_OLHO` (cores das linhas), `VEU` (o quanto escurece por dentro), `ANIMACAO` (tempos: `voltarDepois`, `normalPor`, `piscarEntre`) e `ESPALHADOS` (posição, tamanho e inclinação de cada olho). |
 | `src/posprocesso.js` | Brilho difuso e a cor final da imagem (`COR`: mais escura, roxos mais fortes). |
 | `src/ceu.js` | O céu estrelado do fundo. |
 | `src/materiais.js` | Materiais das partículas e dos brilhos. |

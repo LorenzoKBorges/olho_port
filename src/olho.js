@@ -1,11 +1,11 @@
 /*
- * O olho roxo, no mesmo estilo de arte do Big Bang (luz, brilho difuso e partículas).
+ * Olhos roxos desenhados com luz, no mesmo estilo de arte do Big Bang (luz e brilho difuso).
  *
- * Animação:
- *  - o olho segue o mouse (ou o dedo);
+ * São 5 olhos espalhados pela tela (tamanhos e inclinações diferentes). Animação:
+ *  - cada olho segue o mouse (ou o dedo) a partir de onde está;
  *  - se o ponteiro fica parado por 7 segundos, ele volta a olhar para a frente, fica assim uns
  *    3 segundos e depois começa a olhar para lugares aleatórios; mexeu, volta a seguir;
- *  - pisca a cada 8 a 10 segundos (cada piscada um pouco diferente).
+ *  - cada um pisca a cada 8 a 10 segundos, no seu ritmo (cada piscada um pouco diferente).
  * Os efeitos em volta do olho vêm na próxima etapa.
  *
  * O olho é um desenho feito de luz (sem cores por dentro):
@@ -43,6 +43,27 @@ const ANIMACAO = {
   normalPor: 3, // segundos olhando para a frente antes de começar a olhar para os lados
   piscarEntre: [8, 10], // segundos entre uma piscada e outra
   alcance: { x: 4.6, y: 1.7 }, // até onde a íris vai a partir do meio do olho
+};
+
+// Onde ficam os 5 olhos: x e y de -1 a 1 (bordas da tela), tamanho (1 = o maior) e inclinação
+// em graus. Uma arrumação para tela deitada e outra para tela em pé (celular).
+const ESPALHADOS = {
+  deitada: [
+    [-0.64, 0.5, 0.8, -7],
+    [0.1, 0.62, 0.62, 9],
+    [0.66, 0.3, 0.85, -4],
+    [0.22, -0.4, 1.0, 3],
+    [-0.58, -0.5, 0.74, 8],
+  ],
+  emPe: [
+    [-0.42, 0.74, 0.74, -7],
+    [0.42, 0.42, 0.68, 9],
+    [-0.22, 0.04, 1.0, 3],
+    [0.4, -0.36, 0.74, -5],
+    [-0.36, -0.72, 0.8, 8],
+  ],
+  maiorDeitada: 0.3, // largura do maior olho, em fração da largura da tela (tela deitada)
+  maiorEmPe: 0.5, // (tela em pé)
 };
 
 // a amêndoa é a interseção de dois círculos (raio R, centros em y = +d e y = -d)
@@ -179,16 +200,19 @@ class Olho {
       uFenda: { value: fenda(OLHO.fenda.meiaLargura) },
       uCorIris: { value: cor3(COR_OLHO.iris) },
       uCorPupila: { value: cor3(COR_OLHO.pupila) },
+      uIrisPos: { value: new THREE.Vector2() }, // onde a íris está dentro do olho
+      uIrisEscala: { value: new THREE.Vector2(1, 1) },
     };
     const discoIris = new THREE.Mesh(
       new THREE.PlaneGeometry(lado, lado),
       materialOlho(
         this.uIris,
         /* glsl */ `
+          uniform vec2 uIrisPos; uniform vec2 uIrisEscala;
           varying vec2 vP; varying vec2 vW;
           void main() {
             vP = position.xy;
-            vW = (modelMatrix * vec4(position, 1.0)).xy;
+            vW = position.xy * uIrisEscala + uIrisPos; // posição dentro do olho
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
           }
         `,
@@ -219,6 +243,15 @@ class Olho {
     this.iris.add(discoIris);
   }
 
+  /** Coloca o olho na tela: posição, tamanho e uma leve inclinação. */
+  posicionar(x, y, escala, inclinacao) {
+    this.grupo.position.set(x, y, 0);
+    this.grupo.scale.setScalar(escala);
+    this.grupo.rotation.z = inclinacao;
+    // olhos menores ficam com as linhas um pouco mais grossas (senão somem)
+    this.uComuns.uLinha.value = OLHO.linha / Math.sqrt(Math.min(1, escala * 2.2));
+  }
+
   /**
    * @param olharX, olharY  para onde olha, de -1 a 1 (0 = para a frente)
    * @param abertura        1 = aberto, 0 = fechado (piscando)
@@ -228,6 +261,8 @@ class Olho {
     // a íris vai para o lado e, vista de lado, fica um pouco achatada (o olho é redondo)
     this.iris.position.set(olharX * ANIMACAO.alcance.x, olharY * ANIMACAO.alcance.y, 0);
     this.iris.scale.set(1 - 0.12 * olharX * olharX, 1 - 0.1 * olharY * olharY, 1);
+    this.uIris.uIrisPos.value.set(this.iris.position.x, this.iris.position.y);
+    this.uIris.uIrisEscala.value.set(this.iris.scale.x, this.iris.scale.y);
     // a fenda da pupila abre e fecha um pouco, devagar
     this.uIris.uFenda.value.copy(this.fenda(OLHO.fenda.meiaLargura * (1 + 0.18 * Math.sin(t * 0.7))));
     // piscar: a amêndoa fecha (mais a pálpebra de cima, então fecha um pouco abaixo do meio)
@@ -251,19 +286,42 @@ const cena = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 9000);
 const tex = criarTexturas();
 const ceu = new Ceu(cena, tex, fraco ? 0.5 : 1);
-const olho = new Olho(cena);
-// (o brilho difuso só pega o que é bem claro: senão a íris inteira vira uma mancha)
+const olhos = ESPALHADOS.deitada.map(() => ({
+  olho: new Olho(cena),
+  centro: new THREE.Vector2(),
+  escala: 1,
+  inclinacao: 0,
+  x: 0, // para onde está olhando (-1 a 1)
+  y: 0,
+  vx: 0,
+  vy: 0,
+  alvoX: 0, // para onde quer olhar
+  alvoY: 0,
+  proximaOlhada: 0,
+  piscada: null,
+  proximaPiscada: 0,
+  abertura: 1,
+  quandoPiscou: [], // instantes das últimas piscadas (para conferir o intervalo)
+}));
+// (o brilho difuso só pega o que é bem claro)
 const { composer, bloom } = criarPosProcesso(renderer, cena, camera, { bloom: [0.6, 0.28, 0.6] });
 
 function enquadrar() {
-  // o olho ocupa uns 55% da largura (ou 88% em tela em pé)
-  const largura = OLHO.meiaLargura * 2;
-  const meiaVertical = THREE.MathUtils.degToRad(camera.fov / 2);
-  const fracao = camera.aspect < 1 ? 0.88 : 0.55;
-  const larguraVisivel = largura / fracao;
-  const dist = larguraVisivel / 2 / (Math.tan(meiaVertical) * camera.aspect);
-  camera.position.set(0, 0, Math.max(dist, (OLHO.meiaAltura * 2) / 0.5 / 2 / Math.tan(meiaVertical)));
+  // câmera fixa; os olhos se espalham pela área visível
+  camera.position.set(0, 0, 60);
   camera.lookAt(0, 0, 0);
+  const meiaAltura = camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const meiaLargura = meiaAltura * camera.aspect;
+  const emPe = camera.aspect < 0.9;
+  const lista = emPe ? ESPALHADOS.emPe : ESPALHADOS.deitada;
+  const maior = (2 * meiaLargura * (emPe ? ESPALHADOS.maiorEmPe : ESPALHADOS.maiorDeitada)) / (OLHO.meiaLargura * 2);
+  lista.forEach(([x, y, tamanho, graus], i) => {
+    const o = olhos[i];
+    o.centro.set(x * meiaLargura, y * meiaAltura);
+    o.escala = maior * tamanho;
+    o.inclinacao = THREE.MathUtils.degToRad(graus);
+    o.olho.posicionar(o.centro.x, o.centro.y, o.escala, o.inclinacao);
+  });
 }
 function redimensionar() {
   camera.aspect = innerWidth / innerHeight;
@@ -282,76 +340,65 @@ redimensionar();
 const rand = (a, b) => a + Math.random() * (b - a);
 const estado = {
   modo: 'seguindo', // 'seguindo' o ponteiro, 'voltando' para a frente ou 'vagando' (olhando em volta)
-  x: 0, // para onde o olho está olhando (-1 a 1)
-  y: 0,
-  vx: 0,
-  vy: 0,
-  alvoX: 0, // para onde ele quer olhar
-  alvoY: 0,
+  ponteiro: null, // onde o ponteiro está, no plano dos olhos
   ultimoMovimento: 0,
   fimDoNormal: 0,
-  proximaOlhada: 0,
-  abertura: 1,
-  piscadas: 0,
-  quandoPiscou: [], // instantes das últimas piscadas (para conferir o intervalo)
+  olhos,
   aberturaFixa: null, // para testes: congela a piscada nesta abertura
 };
-let piscada = null;
-let proximaPiscada = rand(...ANIMACAO.piscarEntre);
+// cada olho pisca no seu ritmo (a primeira piscada de cada um num momento diferente)
+for (const o of olhos) o.proximaPiscada = rand(1.5, ANIMACAO.piscarEntre[1]);
 
-// ponteiro -> ponto no plano do olho
+// ponteiro -> ponto no plano dos olhos
 const _ndc = new THREE.Vector3();
 function moveu(e) {
   _ndc.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1, 0.5).unproject(camera);
   _ndc.sub(camera.position).normalize();
   const k = -camera.position.z / _ndc.z;
-  const px = camera.position.x + _ndc.x * k;
-  const py = camera.position.y + _ndc.y * k;
-  // longe do olho ele olha até o canto; perto, mexe menos
-  const d = Math.hypot(px, py) || 1;
-  const forca = Math.min(1, d / (OLHO.meiaLargura + 2));
-  estado.alvoX = (px / d) * forca;
-  estado.alvoY = (py / d) * forca;
+  estado.ponteiro = new THREE.Vector2(camera.position.x + _ndc.x * k, camera.position.y + _ndc.y * k);
   estado.ultimoMovimento = relogio.getElapsedTime();
   estado.modo = 'seguindo';
 }
 addEventListener('pointermove', moveu, { passive: true });
 addEventListener('pointerdown', moveu, { passive: true });
 
-function atualizarOlhar(t, dt) {
-  const parado = t - estado.ultimoMovimento;
-  if (estado.modo === 'seguindo' && parado > ANIMACAO.voltarDepois) {
-    // parou: volta a olhar para a frente, devagar
-    estado.modo = 'voltando';
-    estado.alvoX = 0;
-    estado.alvoY = 0;
-    estado.fimDoNormal = t + rand(ANIMACAO.normalPor - 0.3, ANIMACAO.normalPor + 0.3);
-  } else if (estado.modo === 'voltando' && t > estado.fimDoNormal) {
-    estado.modo = 'vagando';
-    estado.proximaOlhada = t;
-  }
-  if (estado.modo === 'vagando' && t >= estado.proximaOlhada) {
+const _v = new THREE.Vector2();
+function atualizarOlhar(o, t, dt) {
+  if (estado.modo === 'seguindo') {
+    if (estado.ponteiro) {
+      // o ponteiro visto de dentro deste olho (desfazendo posição, tamanho e inclinação)
+      _v.copy(estado.ponteiro).sub(o.centro).divideScalar(o.escala).rotateAround(new THREE.Vector2(), -o.inclinacao);
+      // longe do olho ele olha até o canto; perto, mexe menos
+      const d = _v.length() || 1;
+      const forca = Math.min(1, d / (OLHO.meiaLargura + 2));
+      o.alvoX = (_v.x / d) * forca;
+      o.alvoY = (_v.y / d) * forca;
+    }
+  } else if (estado.modo === 'voltando') {
+    o.alvoX = 0;
+    o.alvoY = 0;
+  } else if (t >= o.proximaOlhada) {
     // olha para outro lugar (longe o bastante do atual para se notar); às vezes volta ao meio
     if (Math.random() < 0.15) {
-      estado.alvoX = rand(-0.1, 0.1);
-      estado.alvoY = rand(-0.1, 0.1);
+      o.alvoX = rand(-0.1, 0.1);
+      o.alvoY = rand(-0.1, 0.1);
     } else {
       let x;
       let y;
       do {
         x = rand(-1, 1);
         y = rand(-0.85, 0.85);
-      } while (Math.hypot(x - estado.alvoX, y - estado.alvoY) < 0.6);
-      estado.alvoX = x;
-      estado.alvoY = y;
+      } while (Math.hypot(x - o.alvoX, y - o.alvoY) < 0.6);
+      o.alvoX = x;
+      o.alvoY = y;
     }
-    estado.proximaOlhada = t + rand(0.9, 2.4);
+    o.proximaOlhada = t + rand(0.9, 2.4);
   }
   // não passa da borda do olho
-  const m = Math.hypot(estado.alvoX, estado.alvoY);
+  const m = Math.hypot(o.alvoX, o.alvoY);
   if (m > 1) {
-    estado.alvoX /= m;
-    estado.alvoY /= m;
+    o.alvoX /= m;
+    o.alvoY /= m;
   }
   // mola sem balanço: segue rápido, volta ao meio devagar, olha em volta com movimentos rápidos
   const k = estado.modo === 'seguindo' ? 70 : estado.modo === 'voltando' ? 9 : 150;
@@ -359,29 +406,28 @@ function atualizarOlhar(t, dt) {
   const passos = 4;
   const h = dt / passos;
   for (let i = 0; i < passos; i++) {
-    estado.vx += (k * (estado.alvoX - estado.x) - c * estado.vx) * h;
-    estado.vy += (k * (estado.alvoY - estado.y) - c * estado.vy) * h;
-    estado.x += estado.vx * h;
-    estado.y += estado.vy * h;
+    o.vx += (k * (o.alvoX - o.x) - c * o.vx) * h;
+    o.vy += (k * (o.alvoY - o.y) - c * o.vy) * h;
+    o.x += o.vx * h;
+    o.y += o.vy * h;
   }
 }
 
-/** Abertura do olho (1 aberto, 0 fechado): pisca a cada 8 a 10 s, cada vez um pouco diferente. */
-function atualizarPiscada(t) {
-  if (!piscada && t >= proximaPiscada) {
-    piscada = { t0: t, fechar: rand(0.07, 0.11), fechado: rand(0.03, 0.08), abrir: rand(0.12, 0.2) };
-    proximaPiscada = t + rand(...ANIMACAO.piscarEntre);
-    estado.piscadas++;
-    estado.quandoPiscou.push(+t.toFixed(2));
-    if (estado.quandoPiscou.length > 10) estado.quandoPiscou.shift();
+/** Abertura de um olho (1 aberto, 0 fechado): pisca a cada 8 a 10 s, cada vez um pouco diferente. */
+function atualizarPiscada(o, t) {
+  if (!o.piscada && t >= o.proximaPiscada) {
+    o.piscada = { t0: t, fechar: rand(0.07, 0.11), fechado: rand(0.03, 0.08), abrir: rand(0.12, 0.2) };
+    o.proximaPiscada = t + rand(...ANIMACAO.piscarEntre);
+    o.quandoPiscou.push(+t.toFixed(2));
+    if (o.quandoPiscou.length > 10) o.quandoPiscou.shift();
   }
-  if (!piscada) return 1;
-  const e = t - piscada.t0;
-  if (e < piscada.fechar) return 1 - (e / piscada.fechar) ** 2;
-  if (e < piscada.fechar + piscada.fechado) return 0;
-  const a = (e - piscada.fechar - piscada.fechado) / piscada.abrir;
+  if (!o.piscada) return 1;
+  const e = t - o.piscada.t0;
+  if (e < o.piscada.fechar) return 1 - (e / o.piscada.fechar) ** 2;
+  if (e < o.piscada.fechar + o.piscada.fechado) return 0;
+  const a = (e - o.piscada.fechar - o.piscada.fechado) / o.piscada.abrir;
   if (a < 1) return 1 - (1 - a) ** 2;
-  piscada = null;
+  o.piscada = null;
   return 1;
 }
 
@@ -392,11 +438,23 @@ function quadro() {
   estado.t = t;
   const dt = Math.min(0.05, t - antes);
   antes = t;
-  atualizarOlhar(t, dt);
-  estado.abertura = estado.aberturaFixa ?? atualizarPiscada(t); // (aberturaFixa: só para testes)
+  // o mesmo relógio para todos: parado 7 s, todos voltam para a frente; ~3 s depois cada um
+  // começa a olhar em volta no seu tempo
+  const parado = t - estado.ultimoMovimento;
+  if (estado.modo === 'seguindo' && parado > ANIMACAO.voltarDepois) {
+    estado.modo = 'voltando';
+    estado.fimDoNormal = t + rand(ANIMACAO.normalPor - 0.3, ANIMACAO.normalPor + 0.3);
+  } else if (estado.modo === 'voltando' && t > estado.fimDoNormal) {
+    estado.modo = 'vagando';
+    for (const o of olhos) o.proximaOlhada = t + rand(0, 0.9);
+  }
   globais.camPos.copy(camera.position);
   ceu.atualizar(t, camera, 1);
-  olho.atualizar(t, estado.x, estado.y, estado.abertura);
+  for (const o of olhos) {
+    atualizarOlhar(o, t, dt);
+    o.abertura = estado.aberturaFixa ?? atualizarPiscada(o, t); // (aberturaFixa: só para testes)
+    o.olho.atualizar(t, o.x, o.y, o.abertura);
+  }
   composer.render();
   requestAnimationFrame(quadro);
 }
