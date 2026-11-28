@@ -10,8 +10,8 @@
  *                  brilham e um feixe de luz horizontal cresce)
  *  5. abrir        abre com um clarão, transformado: a íris virou uma estrela muito forte (a do
  *                  Big Bang: núcleo branco, halo roxo, raios em cruz e os três malabares), a
- *                  pupila virou uma estrela de 4 pontas, aparece uma coroa de pontas em volta do
- *                  olho e raios compridos saem dele
+ *                  íris tem a forma de uma estrela de 8 pontas (algumas passam das pálpebras), a
+ *                  pupila virou uma estrela de 4 pontas e raios compridos saem do olho
  *  6. estrela      a estrela brilha; a pupila (a estrela de 4 pontas) é oca: por ela se vê outro
  *                  espaço
  *  7. entrar       a câmera mergulha na pupila; a luz da estrela passa pelos lados e o oco
@@ -241,6 +241,55 @@ export class Transcendencia {
     );
     this.raios.renderOrder = 13;
     cena.add(this.raios);
+    // a íris transformada: uma estrela de 8 pontas bem luminosa (algumas pontas passam das
+    // pálpebras), girando devagar
+    this.uIrisEstrela = { uT: { value: 0 }, uForca: { value: 0 }, uGiro: { value: 0 }, uR: { value: 0.35 } };
+    this.irisEstrela = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.ShaderMaterial({
+        uniforms: this.uIrisEstrela,
+        vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: /* glsl */ `
+          uniform float uT; uniform float uForca; uniform float uGiro; uniform float uR; varying vec2 vUv;
+          float sdEstrela(vec2 p, float r, float n, float m) {
+            float an = 3.141593 / n;
+            float en = 3.141593 / m;
+            vec2 acs = vec2(cos(an), sin(an));
+            vec2 ecs = vec2(cos(en), sin(en));
+            float bn = mod(atan(p.x, p.y), 2.0 * an) - an;
+            p = length(p) * vec2(cos(bn), abs(sin(bn)));
+            p -= r * acs;
+            p += ecs * clamp(-dot(p, ecs), 0.0, r * acs.y / ecs.y);
+            return length(p) * sign(p.x);
+          }
+          void main() {
+            vec2 p = vUv - 0.5; // (o quadrado tem 1 de lado; a estrela tem raio uR)
+            float c = cos(uGiro);
+            float s = sin(uGiro);
+            p = vec2(c * p.x - s * p.y, s * p.x + c * p.y);
+            float sd = sdEstrela(p, uR, ${8}.0, 4.6) / uR; // (em raios da estrela)
+            float r = length(p) / uR;
+            float dentro = 1.0 - smoothstep(-0.006, 0.006, sd);
+            // o corpo: branco no meio, lilás e roxo indo para as pontas
+            vec3 cor = mix(vec3(1.0, 0.97, 1.0) * 1.6, vec3(0.78, 0.55, 1.0) * 0.75, smoothstep(0.0, 0.45, r));
+            cor = mix(cor, vec3(0.48, 0.22, 0.92) * 0.5, smoothstep(0.45, 1.0, r));
+            float vivo = 0.85 + 0.15 * sin(uT * 3.0 - r * 10.0);
+            // borda bem clara e um brilho fraco por fora
+            float borda = exp(-pow(sd / 0.012, 2.0)) * 1.3 + exp(-max(sd, 0.0) / 0.08) * 0.16;
+            float fade = 1.0 - smoothstep(0.44, 0.5, max(abs(vUv.x - 0.5), abs(vUv.y - 0.5)));
+            gl_FragColor = vec4((cor * dentro * vivo + vec3(0.92, 0.84, 1.0) * borda) * fade * uForca, 1.0);
+          }
+        `,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    this.irisEstrela.renderOrder = 16;
+    this.irisEstrela.visible = false;
+    cena.add(this.irisEstrela);
+
     // o núcleo forte da estrela-íris (bem branco, atrás da pupila oca)
     this.nucleoForte = sprite(tex.brilho, '#ffffff', 1, 0);
     this.nucleoForte.renderOrder = 15;
@@ -433,12 +482,11 @@ export class Transcendencia {
     u.uOpac.value = 1 - smoothstep(0.85, 1, fEntrar);
     u.uBrilho.value = brilho;
     u.uLuzDentro.value = luzDentro;
-    u.uIrisLinha.value = 1 - 0.7 * virouEstrela; // (fica um aro fraco em volta da estrela)
+    u.uIrisLinha.value = 1 - virouEstrela; // (o círculo da íris some: agora a íris é a estrela)
     u.uPupilaLinha.value = 1 + 1.6 * virouEstrela; // a borda da pupila oca fica bem clara (como um eclipse)
-    // olho transformado: a pupila vira estrela de 4 pontas, aparece a coroa de pontas e o olho
+    // olho transformado: a pupila vira estrela de 4 pontas e o olho
     // por dentro fica bem escuro (a estrela da íris se destaca)
     esc.olho.uIris.uForma.value = smoothstep(0, 0.6, fAbrir);
-    u.uCoroa.value = easeOutCubic(fAbrir);
     esc.olho.fundo.material.uniforms.uVeu.value = lerp(this.veuBase, 0.9, virouEstrela);
 
     // ---- os outros olhos: olham para o escolhido e somem
@@ -493,7 +541,7 @@ export class Transcendencia {
     const pulsoEstrela = 1 + 0.05 * Math.sin(t * 5.1) + 0.03 * Math.sin(t * 13.7);
     this.estrela.atualizar(t, (tt, out) => out.copy(estrelaPos), {
       visivel: apareceu > 0.001 && fEntrar < 0.999,
-      brilho: 3.4 * apareceu * pulsoEstrela,
+      brilho: 2.6 * apareceu * pulsoEstrela,
       escala: 1,
       tremor: 0,
       raioMalabares: () => escala * apareceu,
@@ -507,10 +555,21 @@ export class Transcendencia {
     const raioIris = M.raioIris * escala;
     this.nucleoForte.position.copy(estrelaPos).setZ(1.2);
     this.nucleoForte.scale.setScalar(raioIris * 1.5 * pulsoEstrela);
-    this.nucleoForte.material.opacity = 0.95 * apareceu;
+    this.nucleoForte.material.opacity = 0.85 * apareceu;
     this.auraForte.position.copy(estrelaPos).setZ(1.1);
     this.auraForte.scale.setScalar(raioIris * 3.2);
-    this.auraForte.material.opacity = 0.35 * apareceu;
+    this.auraForte.material.opacity = 0.22 * apareceu;
+    // a íris-estrela: cresce a partir da íris quando o olho abre (passando um pouco do tamanho)
+    const cresce = s >= MARCOS.abrir[0] ? 1 + 0.12 * Math.sin(Math.min(1, fAbrir * 1.6) * Math.PI) : 0;
+    const raioEstrela = M.irisEstrela.raio * escala * (0.35 + 0.65 * easeOutCubic(fAbrir)) * cresce;
+    this.irisEstrela.visible = apareceu > 0.001 && !(fEntrar > 0.97);
+    this.irisEstrela.position.copy(estrelaPos).setZ(1.3);
+    this.irisEstrela.scale.setScalar(Math.max(0.001, raioEstrela * 2 * 1.25));
+    this.uIrisEstrela.uR.value = 0.5 / 1.25;
+    this.uIrisEstrela.uT.value = t;
+    this.uIrisEstrela.uGiro.value = 0.25 + t * 0.12;
+    this.uIrisEstrela.uForca.value = apareceu * (0.92 + 0.08 * Math.sin(t * 4.3));
+
     // raios compridos: saem do olho quando ele abre (crescem rápido) e brilham
     this.lancas.visible = apareceu > 0.001;
     this.lancas.position.set(cx, cy, 0.5);
@@ -567,6 +626,7 @@ export class Transcendencia {
       this.brilhoFresta.material.opacity = 0;
       this.raios.visible = false;
       this.lancas.visible = false;
+      this.irisEstrela.visible = false;
       this.nucleoForte.material.opacity = 0;
       this.auraForte.material.opacity = 0;
       if (this.elementos.clarao) this.elementos.clarao.style.opacity = '0';

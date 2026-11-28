@@ -36,7 +36,7 @@ const OLHO = {
   linha: 0.075, // espessura das linhas de luz
   // olho transformado (na cena da transcendência)
   pupilaEstrela: { raio: 2.2 }, // a pupila vira uma estrela de 4 pontas
-  coroa: { raio: 9.4 }, // estrela de 8 pontas atrás do olho (só as pontas aparecem)
+  irisEstrela: { raio: 7.0, pontas: 8 }, // a íris vira uma estrela de 8 pontas (passa das pálpebras)
 };
 const COR_OLHO = {
   contorno: '#e2ccff', // as pálpebras
@@ -186,7 +186,6 @@ class Olho {
       uLuzDentro: { value: 0 }, // luz saindo de dentro do olho (pela fresta da pálpebra)
       uIrisLinha: { value: 1 }, // o círculo da íris (some quando a íris vira a estrela)
       uPupilaLinha: { value: 1 }, // o contorno da fenda
-      uCoroa: { value: 0 }, // a coroa de pontas em volta do olho transformado (0..1)
     };
     this.L = L;
 
@@ -202,7 +201,6 @@ class Olho {
           uVeuCor: { value: cor3(COR_OLHO.veu) },
           uVeu: { value: VEU },
           uSobra: { value: OLHO.sobra },
-          uCoroaR: { value: OLHO.coroa.raio },
         },
         /* glsl */ `
           varying vec2 vP;
@@ -212,7 +210,6 @@ class Olho {
           uniform float uT; uniform vec3 uContorno; uniform vec3 uHalo; uniform vec3 uVeuCor; uniform float uVeu;
           uniform float uSobra; uniform float uLinha;
           uniform float uOpac; uniform float uBrilho; uniform float uLuzDentro;
-          uniform float uCoroa; uniform float uCoroaR;
           varying vec2 vP;
           ${GLSL_COMUM}
           // uma pálpebra: arco de círculo (centro c, raio R) até um pouco além das pontas
@@ -249,15 +246,6 @@ class Olho {
             brilho += (uAzulG * linhasAzul + uVermG * 1.6 * linhasVerm) * uGlitch * 1.3;
             // luz saindo de dentro (mais forte no meio da fresta)
             brilho += vec3(0.96, 0.9, 1.0) * dentro * uLuzDentro * (0.55 + 0.45 * exp(-vP.x * vP.x / 30.0));
-            // coroa: uma estrela de 8 pontas atrás do olho (só as pontas aparecem, por fora)
-            if (uCoroa > 0.0) {
-              float escalaCoroa = 0.6 + 0.4 * uCoroa;
-              vec2 q = vP / (vec2(1.35, 1.0) * escalaCoroa);
-              float dc = abs(sdEstrela(q, uCoroaR, 8.0, 4.2)) * escalaCoroa;
-              float coroa = (exp(-pow(dc / (uLinha * 0.85), 2.0)) + 0.15 * exp(-pow(dc / (uLinha * 4.0), 2.0)));
-              coroa *= smoothstep(0.1, 0.6, sd) * uCoroa;
-              brilho += uContorno * coroa * pulso;
-            }
             float veu = dentro * uVeu * uOpac;
             gl_FragColor = vec4(uVeuCor * veu + brilho * uOpac, veu);
           }

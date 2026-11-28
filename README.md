@@ -42,7 +42,7 @@ página abrir (ou quando o código chama `olho.transcender()`):
 | 2 – 4,6 s | Ele transcende: treme cada vez mais, olha para todo lado muito rápido, falha em azul e vermelho, e partículas de energia caem girando para dentro dele. |
 | 4,6 – 5,1 s | Fecha o olho quase todo; silêncio. |
 | 5,1 – 7,3 s | Uma luz começa a sair pela fresta da pálpebra: a fresta acende, um feixe horizontal cresce e raios de luz escapam por cima e por baixo. |
-| 7,3 – 8 s | Abre com um clarão, transformado: a íris virou uma estrela muito forte (a do Big Bang: núcleo branco, halo, raios em cruz e os três malabares), a pupila virou uma estrela de 4 pontas, aparece uma coroa de pontas em volta do olho e raios compridos saem dele. |
+| 7,3 – 8 s | Abre com um clarão, transformado: a íris virou uma estrela de 8 pontas muito luminosa (como a estrela do Big Bang, com núcleo branco, raios em cruz e os três malabares), com algumas pontas passando das pálpebras; a pupila virou uma estrela de 4 pontas; e raios compridos saem do olho. |
 | 8 – 10,4 s | A estrela brilha. A pupila (a estrela de 4 pontas) é oca: por ela se vê outro espaço, escuro, com estrelas fracas. |
 | 10,4 – 13 s | A câmera mergulha na pupila: a luz da estrela passa pelos lados e o oco toma a tela inteira. |
 | depois | Espaço vazio. A página mostra o `<main id="final">` e dispara o evento `olho:fim`. |
