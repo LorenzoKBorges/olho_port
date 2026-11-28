@@ -8,8 +8,8 @@
  *                            e cresce, enquanto os outros recuam para o fundo e somem; a câmera
  *                            se aproxima devagar e o céu escurece
  *   2,4 –  6,2  transcender  ele treme cada vez mais, olha para todo lado cada vez mais rápido,
- *                            falha em azul e vermelho; energia cai girando para dentro dele
- *   6,2 –  7,5  fechar       fecha devagar; o tremor morre aos poucos e a energia é sugada por ele
+ *                            falha em azul e vermelho
+ *   6,2 –  7,5  fechar       fecha devagar; o tremor morre aos poucos
  *   7,5 –  8,0  silêncio
  *   7,9 – 10,4  luz          uma luz cresce pela fresta (feixe e raios); a câmera chega mais perto
  *  10,4 – 11,5  abrir        abre (passando um pouco) com clarão, onda de choque e faíscas; a
@@ -682,7 +682,8 @@ export class Transcendencia {
     if (this.elementos.vinheta) this.elementos.vinheta.style.opacity = (0.8 + 0.2 * entre(0, 2.6, s)).toFixed(3);
     this.poeira.atualizar(t, entre(0, 2.5, s));
     const largura = M.meiaLargura * 2 * escala;
-    this.energia.atualizar(t, entre(2.7, 3.8, s) * (1 - entre(6.7, 7.3, s)), entre(6.1, 7.2, s), this._v.set(cx, cy), largura);
+    // (as partículas de energia que caíam no olho enquanto ele tremia foram tiradas)
+    this.energia.atualizar(t, 0, 0, this._v.set(cx, cy), largura);
 
     // ---- luz pela fresta (feixe, risco e raios), que some quando o olho abre
     const feixe = Math.pow(entre(...T.luz, s), 1.3) * (1 - entre(10.45, 11.0, s));

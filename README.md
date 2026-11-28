@@ -39,8 +39,8 @@ página abrir (ou quando o código chama `olho.transcender()`):
 | Tempo | O que acontece |
 | --- | --- |
 | 0 – 2,6 s | Os outros olhos olham para um deles; ele falha, desliza para o meio e cresce, enquanto os outros recuam para o fundo e somem. A câmera se aproxima devagar e o céu escurece. |
-| 2,6 – 6,2 s | Ele transcende: treme cada vez mais, olha para todo lado cada vez mais rápido, falha em azul e vermelho, e energia cai girando para dentro dele. |
-| 6,2 – 7,5 s | Fecha devagar: o tremor morre aos poucos e a energia é sugada para dentro dele. Silêncio. |
+| 2,6 – 6,2 s | Ele transcende: treme cada vez mais, olha para todo lado cada vez mais rápido, e falha em azul e vermelho. |
+| 6,2 – 7,5 s | Fecha devagar e o tremor morre aos poucos. Silêncio. |
 | 8 – 10,4 s | Uma luz cresce pela fresta da pálpebra (feixe e raios escapando) e a câmera chega mais perto. |
 | 10,4 – 11,5 s | Abre com clarão, onda de choque e faíscas, e a câmera recua com o susto. Transformado: a íris é uma estrela de 8 pontas muito luminosa (com a estrela do Big Bang no meio), algumas pontas passando das pálpebras; a pupila é uma estrela de 4 pontas; e raios compridos saem do olho. |
 | 11,5 – 14,6 s | A câmera gira um pouco em volta. A pupila é oca: por ela se vê o espaço vazio, com profundidade de verdade. |
@@ -83,7 +83,7 @@ npm run dev
 | Arquivo | O quê |
 | --- | --- |
 | `src/olho.js` | O olho e a animação. No topo: `OLHO` (medidas, espessura das linhas, tamanho da fenda), `COR_OLHO` (cores das linhas), `VEU` (o quanto escurece por dentro), `ANIMACAO` (tempos: `voltarDepois`, `normalPor`, `piscarEntre`), `EFEITOS` (cores e tempos da falha e do clique) e `ESPALHADOS` (posição, tamanho e inclinação de cada olho). |
-| `src/transcender.js` | A cena da transcendência (fases, energia, luz pela fresta, estrela, pupila oca e o espaço vazio). |
+| `src/transcender.js` | A cena da transcendência (fases, luz pela fresta, estrela, pupila oca e o espaço vazio). |
 | `src/estrela.js` | A estrela do Big Bang (usada na cena). |
 | `src/posprocesso.js` | Brilho difuso e a cor final da imagem (`COR`: mais escura, roxos mais fortes). |
 | `src/ceu.js` | O céu estrelado do fundo. |
