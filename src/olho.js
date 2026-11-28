@@ -343,8 +343,8 @@ class Olho {
   }
 
   /** Coloca o olho na tela: posição, tamanho e uma leve inclinação. */
-  posicionar(x, y, escala, inclinacao) {
-    this.grupo.position.set(x, y, 0);
+  posicionar(x, y, escala, inclinacao, z = 0) {
+    this.grupo.position.set(x, y, z);
     this.grupo.scale.setScalar(escala);
     this.grupo.rotation.z = inclinacao;
     // olhos menores ficam com as linhas um pouco mais grossas (senão somem)
@@ -415,6 +415,7 @@ const { composer, bloom } = criarPosProcesso(renderer, cena, camera, { bloom: [0
 
 // a cena da transcendência (um olho é escolhido, vira a estrela e entramos na pupila)
 const trans = new Transcendencia({
+  renderer,
   cena,
   camera,
   tex,
@@ -458,6 +459,7 @@ function redimensionar() {
   const h = renderer.getDrawingBufferSize(new THREE.Vector2()).y;
   globais.uEscalaPixel.value = h / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
   enquadrar();
+  trans.redimensionar();
 }
 addEventListener('resize', redimensionar);
 redimensionar();
@@ -597,7 +599,7 @@ function atualizarOlhar(o, t, dt) {
     o.alvoY /= m;
   }
   // mola sem balanço: segue rápido, volta ao meio devagar, olha em volta com movimentos rápidos
-  const k = estado.modo === 'seguindo' ? 70 : estado.modo === 'voltando' ? 9 : 150;
+  const k = estado.modo === 'seguindo' ? 70 : estado.modo === 'voltando' ? 9 : 110;
   const c = 2 * Math.sqrt(k);
   const passos = 4;
   const h = dt / passos;
@@ -628,6 +630,7 @@ function atualizarPiscada(o, t) {
 }
 
 const relogio = new THREE.Clock();
+const _tam = new THREE.Vector2();
 
 // começo da cena: ?transcender começa logo; ?cena=7.5 começa e congela no segundo 7,5 da cena
 // (para testes); senão, sozinha depois de TRANSCENDER.inicioAutomatico segundos
@@ -661,6 +664,9 @@ function quadro() {
   if (!trans.ativa && inicioDaCena != null && t >= inicioDaCena) transcender();
   if (trans.ativa) {
     trans.atualizar(t, dt);
+    // (a câmera voa na cena: o tamanho das partículas acompanha a lente)
+    globais.camPos.copy(camera.position);
+    globais.uEscalaPixel.value = renderer.getDrawingBufferSize(_tam).y / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
     composer.render();
     requestAnimationFrame(quadro);
     return;
