@@ -20,6 +20,24 @@
         height: 100%;
         display: block;
       }
+      /* clarão quando o olho abre e vira estrela */
+      #clarao {
+        position: fixed;
+        inset: 0;
+        background: #f3e8ff;
+        opacity: 0;
+        pointer-events: none;
+      }
+      /* o conteúdo de depois da cena (aparece no espaço vazio, no fim) */
+      #final {
+        position: fixed;
+        inset: 0;
+        overflow: auto;
+        color: #f3e8ff;
+      }
+      #final[hidden] {
+        display: none;
+      }
       /* escurece as bordas (o mesmo do Big Bang) */
       #vinheta {
         position: fixed;
@@ -31,8 +49,10 @@
     </style>
   </head>
   <body>
-    <div id="palco" role="img" aria-label="Um olho roxo brilhante"></div>
+    <div id="palco" role="img" aria-label="Olhos roxos brilhantes que seguem o ponteiro"></div>
     <div id="vinheta"></div>
+    <div id="clarao"></div>
+    <main id="final" hidden></main>
     <script src="js/olho.js"></script>
   </body>
 </html>

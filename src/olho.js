@@ -10,6 +10,8 @@
  *  - de vez em quando cada olho "falha" por uma fração de segundo: as linhas se dividem numa
  *    cópia azul e outra vermelho-escura, algumas faixas escorregam para o lado e tudo pisca;
  *  - clicou (ou tocou) num olho: ele pisca vermelho, fica quase fechado por ~5 s e depois abre.
+ * Depois de um tempo começa a cena da transcendência (src/transcender.js): um olho é escolhido,
+ * a íris vira a estrela do Big Bang e a câmera entra na pupila, até o espaço vazio.
  *
  * O olho é um desenho feito de luz (sem cores por dentro):
  *  - as pálpebras são duas linhas de luz lilás que se cruzam um pouco além das pontas, com um halo
@@ -22,6 +24,7 @@ import { criarTexturas } from './texturas.js';
 import { globais } from './materiais.js';
 import { Ceu } from './ceu.js';
 import { criarPosProcesso, prepararRenderizador } from './posprocesso.js';
+import { Transcendencia, TRANSCENDER } from './transcender.js';
 
 // ---------------------------------------------------------------- medidas do olho
 const OLHO = {
@@ -161,6 +164,12 @@ class Olho {
       uAzulG: { value: cor3(EFEITOS.azul) },
       uVermG: { value: cor3(EFEITOS.vermelho) },
       uVermClique: { value: cor3(EFEITOS.vermelhoClique) },
+      // usados na cena da transcendência
+      uOpac: { value: 1 }, // o olho inteiro (some quando outro é escolhido)
+      uBrilho: { value: 1 }, // linhas mais fortes
+      uLuzDentro: { value: 0 }, // luz saindo de dentro do olho (pela fresta da pálpebra)
+      uIrisLinha: { value: 1 }, // o círculo da íris (some quando a íris vira a estrela)
+      uPupilaLinha: { value: 1 }, // o contorno da fenda
     };
     this.L = L;
 
@@ -184,6 +193,7 @@ class Olho {
         /* glsl */ `
           uniform float uT; uniform vec3 uContorno; uniform vec3 uHalo; uniform vec3 uVeuCor; uniform float uVeu;
           uniform float uSobra; uniform float uLinha;
+          uniform float uOpac; uniform float uBrilho; uniform float uLuzDentro;
           varying vec2 vP;
           ${GLSL_COMUM}
           // uma pálpebra: arco de círculo (centro c, raio R) até um pouco além das pontas
@@ -216,10 +226,12 @@ class Olho {
             halo *= 1.0 - smoothstep(4.0, 7.5, fora);
             vec3 corLinha = mix(uContorno, uVermClique, uVermelho);
             vec3 corHalo = mix(uHalo, uVermG, uVermelho * 0.8);
-            vec3 brilho = (corLinha * linhas * (1.0 - 0.5 * uGlitch) + corHalo * halo) * pulso;
+            vec3 brilho = (corLinha * linhas * (1.0 - 0.5 * uGlitch) * uBrilho + corHalo * halo * (0.6 + 0.4 * uBrilho)) * pulso;
             brilho += (uAzulG * linhasAzul + uVermG * 1.6 * linhasVerm) * uGlitch * 1.3;
-            float veu = dentro * uVeu;
-            gl_FragColor = vec4(uVeuCor * veu + brilho, veu);
+            // luz saindo de dentro (mais forte no meio da fresta)
+            brilho += vec3(0.96, 0.9, 1.0) * dentro * uLuzDentro * (0.55 + 0.45 * exp(-vP.x * vP.x / 30.0));
+            float veu = dentro * uVeu * uOpac;
+            gl_FragColor = vec4(uVeuCor * veu + brilho * uOpac, veu);
           }
         `
       )
@@ -263,6 +275,7 @@ class Olho {
         /* glsl */ `
           uniform float uT; uniform float uRi; uniform vec2 uFenda; uniform vec3 uCorIris; uniform vec3 uCorPupila;
           uniform float uLinha;
+          uniform float uOpac; uniform float uBrilho; uniform float uIrisLinha; uniform float uPupilaLinha;
           varying vec2 vP; varying vec2 vW;
           ${GLSL_COMUM}
           // amêndoa em pé (a fenda da pupila): círculos de raio R com centros em x = +d e x = -d
@@ -275,8 +288,8 @@ class Olho {
           float tracos(vec2 p, vec3 corIris, vec3 corPupila, out vec3 cor) {
             float iris = traco(abs(length(p) - uRi), uLinha * 0.9);
             float pupila = traco(abs(sdFenda(p)), uLinha * 0.85);
-            cor = corIris * iris * 0.85 + corPupila * pupila;
-            return iris + pupila;
+            cor = corIris * iris * 0.85 * uIrisLinha + corPupila * pupila * uPupilaLinha;
+            return iris * uIrisLinha + pupila * uPupilaLinha;
           }
           void main() {
             // na falha, as mesmas faixas que escorregam nas pálpebras escorregam aqui
@@ -298,7 +311,7 @@ class Olho {
               float b = tracos(p - vec2(desvio, 0.08 * uGlitch), uVermG, uVermG, lixo);
               cor += (uAzulG * a + uVermG * 1.6 * b) * uGlitch * 1.1;
             }
-            cor *= visivel;
+            cor *= visivel * uBrilho * uOpac;
             cor *= 1.0 - smoothstep(uRi + 0.35, uRi + 0.7, length(vP)); // (zero antes da borda do quadrado)
             gl_FragColor = vec4(cor, 0.0); // só luz: por dentro tudo é transparente
           }
@@ -379,6 +392,25 @@ const olhos = ESPALHADOS.deitada.map(() => ({
 }));
 // (o brilho difuso só pega o que é bem claro)
 const { composer, bloom } = criarPosProcesso(renderer, cena, camera, { bloom: [0.6, 0.28, 0.6] });
+
+// a cena da transcendência (um olho é escolhido, vira a estrela e entramos na pupila)
+const trans = new Transcendencia({
+  cena,
+  camera,
+  tex,
+  composer,
+  olhos,
+  ceu,
+  medidas: OLHO,
+  elementos: { vinheta: document.getElementById('vinheta'), clarao: document.getElementById('clarao') },
+  aoTerminar: () => {
+    // acabou no espaço vazio: mostra o conteúdo de depois e avisa quem quiser saber
+    const final = document.getElementById('final');
+    if (final) final.hidden = false;
+    document.body.classList.add('fim');
+    window.dispatchEvent(new CustomEvent('olho:fim'));
+  },
+});
 
 function enquadrar() {
   // câmera fixa; os olhos se espalham pela área visível
@@ -482,6 +514,7 @@ function olhoEm(ponto) {
 // ponteiro -> ponto no plano dos olhos
 const _ndc = new THREE.Vector3();
 function moveu(e) {
+  if (trans.ativa) return; // durante a cena os olhos não seguem mais o ponteiro
   _ndc.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1, 0.5).unproject(camera);
   _ndc.sub(camera.position).normalize();
   const k = -camera.position.z / _ndc.z;
@@ -494,6 +527,7 @@ function moveu(e) {
 }
 addEventListener('pointermove', moveu, { passive: true });
 addEventListener('pointerdown', (e) => {
+  if (trans.ativa) return;
   moveu(e);
   const i = olhoEm(estado.ponteiro);
   if (i < 0) return;
@@ -574,6 +608,18 @@ function atualizarPiscada(o, t) {
 }
 
 const relogio = new THREE.Clock();
+
+// começo da cena: ?transcender começa logo; ?cena=7.5 começa e congela no segundo 7,5 da cena
+// (para testes); senão, sozinha depois de TRANSCENDER.inicioAutomatico segundos
+const parametros = new URLSearchParams(location.search);
+let inicioDaCena = parametros.has('transcender') || parametros.has('cena') ? 0.5 : TRANSCENDER.inicioAutomatico;
+if (parametros.has('cena')) trans.congelar = Number(parametros.get('cena')) || 0;
+function transcender(indice = Math.floor(Math.random() * olhos.length)) {
+  inicioDaCena = null;
+  palco.style.cursor = 'default';
+  for (const o of olhos) o.cliqueIni = -1;
+  trans.iniciar(relogio.getElapsedTime(), indice);
+}
 let antes = 0;
 function quadro() {
   const t = relogio.getElapsedTime();
@@ -591,6 +637,14 @@ function quadro() {
     for (const o of olhos) o.proximaOlhada = t + rand(0, 0.9);
   }
   globais.camPos.copy(camera.position);
+  // a cena da transcendência começa sozinha depois de um tempo (ou com olho.transcender())
+  if (!trans.ativa && inicioDaCena != null && t >= inicioDaCena) transcender();
+  if (trans.ativa) {
+    trans.atualizar(t, dt);
+    composer.render();
+    requestAnimationFrame(quadro);
+    return;
+  }
   ceu.atualizar(t, camera, 1);
   for (const o of olhos) {
     atualizarOlhar(o, t, dt);
@@ -613,6 +667,8 @@ requestAnimationFrame(quadro);
 
 // para testes: window.olho mostra o estado atual; telaDoOlho(i) diz onde o olho i está na tela
 estado.glitchFixo = null;
+estado.transcender = transcender; // olho.transcender() começa a cena (olho.transcender(2): com o olho 2)
+estado.cena = trans;
 estado.telaDoOlho = (i) => {
   const v = new THREE.Vector3(olhos[i].centro.x, olhos[i].centro.y, 0).project(camera);
   return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight };
