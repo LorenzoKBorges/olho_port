@@ -33,7 +33,7 @@ Também funciona em qualquer hospedagem estática (GitHub Pages, Netlify, Vercel
 
 ## A transcendência
 
-Uma cena no estilo do Big Bang (cerca de 20 segundos), em que a câmera voa como no Big Bang, que começa sozinha 15 segundos depois de a
+Uma cena no estilo do Big Bang (cerca de 20 segundos, com a câmera voando), que começa sozinha 15 segundos depois de a
 página abrir (ou quando o código chama `olho.transcender()`):
 
 | Tempo | O que acontece |
