@@ -33,7 +33,7 @@ Também funciona em qualquer hospedagem estática (GitHub Pages, Netlify, Vercel
 
 ## A transcendência
 
-Uma cena no estilo do Big Bang (cerca de 12 segundos), que começa sozinha 15 segundos depois de a
+Uma cena no estilo do Big Bang (cerca de 13 segundos), que começa sozinha 15 segundos depois de a
 página abrir (ou quando o código chama `olho.transcender()`):
 
 | Tempo | O que acontece |
@@ -42,9 +42,9 @@ página abrir (ou quando o código chama `olho.transcender()`):
 | 2 – 4,6 s | Ele transcende: treme cada vez mais, olha para todo lado muito rápido, falha em azul e vermelho, e partículas de energia caem girando para dentro dele. |
 | 4,6 – 5,1 s | Fecha o olho quase todo; silêncio. |
 | 5,1 – 7,3 s | Uma luz começa a sair pela fresta da pálpebra: a fresta acende, um feixe horizontal cresce e raios de luz escapam por cima e por baixo. |
-| 7,3 – 7,9 s | Abre com um clarão: a íris virou a estrela do Big Bang (núcleo, halo, raios em cruz e os três malabares girando). |
-| 7,9 – 9,7 s | A estrela brilha. A pupila (a fenda) é oca: por ela se vê outro espaço, escuro, com estrelas fracas. |
-| 9,7 – 12,3 s | A câmera mergulha na pupila: a luz da estrela passa pelos lados e o oco toma a tela inteira. |
+| 7,3 – 8 s | Abre com um clarão, transformado: a íris virou uma estrela muito forte (a do Big Bang: núcleo branco, halo, raios em cruz e os três malabares), a pupila virou uma estrela de 4 pontas, aparece uma coroa de pontas em volta do olho e raios compridos saem dele. |
+| 8 – 10,4 s | A estrela brilha. A pupila (a estrela de 4 pontas) é oca: por ela se vê outro espaço, escuro, com estrelas fracas. |
+| 10,4 – 13 s | A câmera mergulha na pupila: a luz da estrela passa pelos lados e o oco toma a tela inteira. |
 | depois | Espaço vazio. A página mostra o `<main id="final">` e dispara o evento `olho:fim`. |
 
 Para colocar conteúdo depois da cena, escreva dentro do `<main id="final" hidden>` do HTML (ele fica

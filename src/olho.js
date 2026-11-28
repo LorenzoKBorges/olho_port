@@ -34,6 +34,9 @@ const OLHO = {
   raioIris: 4.5,
   fenda: { meiaAltura: 3.5, meiaLargura: 0.85 }, // a pupila é uma fenda em pé (olho de gato)
   linha: 0.075, // espessura das linhas de luz
+  // olho transformado (na cena da transcendência)
+  pupilaEstrela: { raio: 2.2 }, // a pupila vira uma estrela de 4 pontas
+  coroa: { raio: 9.4 }, // estrela de 8 pontas atrás do olho (só as pontas aparecem)
 };
 const COR_OLHO = {
   contorno: '#e2ccff', // as pálpebras
@@ -112,6 +115,19 @@ const GLSL_COMUM = /* glsl */ `
       mix(mix(hash(i + vec3(0, 0, 1)), hash(i + vec3(1, 0, 1)), f.x), mix(hash(i + vec3(0, 1, 1)), hash(i + vec3(1, 1, 1)), f.x), f.y),
       f.z);
   }
+  // estrela de n pontas (de Inigo Quilez): raio r até as pontas; m (2..n) deixa os lados mais
+  // ou menos côncavos. As pontas ficam em cima, embaixo e dos lados.
+  float sdEstrela(vec2 p, float r, float n, float m) {
+    float an = 3.141593 / n;
+    float en = 3.141593 / m;
+    vec2 acs = vec2(cos(an), sin(an));
+    vec2 ecs = vec2(cos(en), sin(en));
+    float bn = mod(atan(p.x, p.y), 2.0 * an) - an;
+    p = length(p) * vec2(cos(bn), abs(sin(bn)));
+    p -= r * acs;
+    p += ecs * clamp(-dot(p, ecs), 0.0, r * acs.y / ecs.y);
+    return length(p) * sign(p.x);
+  }
   // falha (glitch): algumas faixas horizontais do olho escorregam para o lado
   uniform float uGlitch; uniform float uSemente; uniform float uVermelho;
   uniform vec3 uAzulG; uniform vec3 uVermG; uniform vec3 uVermClique;
@@ -170,6 +186,7 @@ class Olho {
       uLuzDentro: { value: 0 }, // luz saindo de dentro do olho (pela fresta da pálpebra)
       uIrisLinha: { value: 1 }, // o círculo da íris (some quando a íris vira a estrela)
       uPupilaLinha: { value: 1 }, // o contorno da fenda
+      uCoroa: { value: 0 }, // a coroa de pontas em volta do olho transformado (0..1)
     };
     this.L = L;
 
@@ -185,6 +202,7 @@ class Olho {
           uVeuCor: { value: cor3(COR_OLHO.veu) },
           uVeu: { value: VEU },
           uSobra: { value: OLHO.sobra },
+          uCoroaR: { value: OLHO.coroa.raio },
         },
         /* glsl */ `
           varying vec2 vP;
@@ -194,6 +212,7 @@ class Olho {
           uniform float uT; uniform vec3 uContorno; uniform vec3 uHalo; uniform vec3 uVeuCor; uniform float uVeu;
           uniform float uSobra; uniform float uLinha;
           uniform float uOpac; uniform float uBrilho; uniform float uLuzDentro;
+          uniform float uCoroa; uniform float uCoroaR;
           varying vec2 vP;
           ${GLSL_COMUM}
           // uma pálpebra: arco de círculo (centro c, raio R) até um pouco além das pontas
@@ -230,6 +249,15 @@ class Olho {
             brilho += (uAzulG * linhasAzul + uVermG * 1.6 * linhasVerm) * uGlitch * 1.3;
             // luz saindo de dentro (mais forte no meio da fresta)
             brilho += vec3(0.96, 0.9, 1.0) * dentro * uLuzDentro * (0.55 + 0.45 * exp(-vP.x * vP.x / 30.0));
+            // coroa: uma estrela de 8 pontas atrás do olho (só as pontas aparecem, por fora)
+            if (uCoroa > 0.0) {
+              float escalaCoroa = 0.6 + 0.4 * uCoroa;
+              vec2 q = vP / (vec2(1.35, 1.0) * escalaCoroa);
+              float dc = abs(sdEstrela(q, uCoroaR, 8.0, 4.2)) * escalaCoroa;
+              float coroa = (exp(-pow(dc / (uLinha * 0.85), 2.0)) + 0.15 * exp(-pow(dc / (uLinha * 4.0), 2.0)));
+              coroa *= smoothstep(0.1, 0.6, sd) * uCoroa;
+              brilho += uContorno * coroa * pulso;
+            }
             float veu = dentro * uVeu * uOpac;
             gl_FragColor = vec4(uVeuCor * veu + brilho * uOpac, veu);
           }
@@ -258,6 +286,8 @@ class Olho {
       uCorPupila: { value: cor3(COR_OLHO.pupila) },
       uIrisPos: { value: new THREE.Vector2() }, // onde a íris está dentro do olho
       uIrisEscala: { value: new THREE.Vector2(1, 1) },
+      uForma: { value: 0 }, // a pupila: 0 = fenda, 1 = estrela de 4 pontas (olho transformado)
+      uEstrelaR: { value: OLHO.pupilaEstrela.raio },
     };
     const discoIris = new THREE.Mesh(
       new THREE.PlaneGeometry(lado, lado),
@@ -276,6 +306,7 @@ class Olho {
           uniform float uT; uniform float uRi; uniform vec2 uFenda; uniform vec3 uCorIris; uniform vec3 uCorPupila;
           uniform float uLinha;
           uniform float uOpac; uniform float uBrilho; uniform float uIrisLinha; uniform float uPupilaLinha;
+          uniform float uForma; uniform float uEstrelaR;
           varying vec2 vP; varying vec2 vW;
           ${GLSL_COMUM}
           // amêndoa em pé (a fenda da pupila): círculos de raio R com centros em x = +d e x = -d
@@ -287,7 +318,8 @@ class Olho {
           float traco(float d, float w) { return exp(-pow(d / w, 2.0)) + 0.16 * exp(-pow(d / (w * 4.0), 2.0)); }
           float tracos(vec2 p, vec3 corIris, vec3 corPupila, out vec3 cor) {
             float iris = traco(abs(length(p) - uRi), uLinha * 0.9);
-            float pupila = traco(abs(sdFenda(p)), uLinha * 0.85);
+            float sdPupila = uForma > 0.0 ? mix(sdFenda(p), sdEstrela(p, uEstrelaR, 4.0, 3.0), uForma) : sdFenda(p);
+            float pupila = traco(abs(sdPupila), uLinha * 0.85);
             cor = corIris * iris * 0.85 * uIrisLinha + corPupila * pupila * uPupilaLinha;
             return iris * uIrisLinha + pupila * uPupilaLinha;
           }

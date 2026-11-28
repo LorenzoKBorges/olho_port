@@ -8,9 +8,12 @@
  *  3. fechar       fecha o olho quase todo; silêncio
  *  4. luz          uma luz começa a sair pela fresta da pálpebra (a fresta acende, as pálpebras
  *                  brilham e um feixe de luz horizontal cresce)
- *  5. abrir        abre com um clarão: a íris virou a estrela do Big Bang (núcleo branco, halo
- *                  roxo, raios em cruz e os três malabares girando)
- *  6. estrela      a estrela brilha; a pupila (a fenda) é oca: por ela se vê outro espaço
+ *  5. abrir        abre com um clarão, transformado: a íris virou uma estrela muito forte (a do
+ *                  Big Bang: núcleo branco, halo roxo, raios em cruz e os três malabares), a
+ *                  pupila virou uma estrela de 4 pontas, aparece uma coroa de pontas em volta do
+ *                  olho e raios compridos saem dele
+ *  6. estrela      a estrela brilha; a pupila (a estrela de 4 pontas) é oca: por ela se vê outro
+ *                  espaço
  *  7. entrar       a câmera mergulha na pupila; a luz da estrela passa pelos lados e o oco
  *                  toma a tela inteira
  *  8. vazio        espaço vazio (escuro, com estrelas bem fracas) — dispara o evento `olho:fim`
@@ -23,7 +26,17 @@ import { criarRng, smoothstep, lerp, clamp, easeInOutCubic, easeInCubic, easeOut
 
 export const TRANSCENDER = {
   inicioAutomatico: 15, // segundos depois de abrir a página (null = só com olho.transcender())
-  fases: { escolher: 2.0, transcender: 2.6, fechar: 0.5, luz: 2.2, abrir: 0.6, estrela: 1.8, entrar: 2.6 },
+  fases: { escolher: 2.0, transcender: 2.6, fechar: 0.5, luz: 2.2, abrir: 0.7, estrela: 2.4, entrar: 2.6 },
+  // olho transformado: raios compridos saindo dele (ângulo em graus, 0 = direita; comprimento em
+  // larguras do olho), como no desenho
+  lancas: [
+    [150, 2.3],
+    [178, 1.7],
+    [220, 1.1],
+    [22, 2.5],
+    [340, 2.0],
+    [305, 1.4],
+  ],
   tamanho: { deitada: 0.6, emPe: 0.92 }, // largura do olho escolhido, em fração da largura da tela
   mergulho: 90, // quanto o olho cresce quando a câmera entra na pupila
 };
@@ -110,12 +123,26 @@ const SHADER_VAZIO = {
     uTudo: { value: 0 },
     uPx: { value: 0.002 },
     uT: { value: 0 },
+    uForma: { value: 0 }, // 0 = fenda, 1 = estrela de 4 pontas
+    uEstrelaR: { value: 0.05 }, // raio da estrela (em alturas de tela)
   },
   vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: /* glsl */ `
     uniform sampler2D tDiffuse; uniform vec2 uCentro; uniform vec2 uMeio; uniform float uAspecto;
     uniform float uForca; uniform float uTudo; uniform float uPx; uniform float uT;
+    uniform float uForma; uniform float uEstrelaR;
     varying vec2 vUv;
+    float sdEstrela4(vec2 p, float r, float m) {
+      float an = 3.141593 / 4.0;
+      float en = 3.141593 / m;
+      vec2 acs = vec2(cos(an), sin(an));
+      vec2 ecs = vec2(cos(en), sin(en));
+      float bn = mod(atan(p.x, p.y), 2.0 * an) - an;
+      p = length(p) * vec2(cos(bn), abs(sin(bn)));
+      p -= r * acs;
+      p += ecs * clamp(-dot(p, ecs), 0.0, r * acs.y / ecs.y);
+      return length(p) * sign(p.x);
+    }
     // amêndoa em pé (a fenda): meia largura m.x, meia altura m.y
     float sdFenda(vec2 p, vec2 m) {
       float k = m.y * m.y / m.x;
@@ -144,7 +171,8 @@ const SHADER_VAZIO = {
       vec4 c = texture2D(tDiffuse, vUv);
       if (uForca <= 0.0) { gl_FragColor = c; return; }
       vec2 p = (vUv - uCentro) * vec2(uAspecto, 1.0);
-      float dentro = max(1.0 - smoothstep(-uPx, uPx, sdFenda(p, uMeio)), uTudo) * uForca;
+      float sd = mix(sdFenda(p, uMeio), sdEstrela4(p, uEstrelaR, 3.0), uForma);
+      float dentro = max(1.0 - smoothstep(-uPx, uPx, sd), uTudo) * uForca;
       c.rgb = mix(c.rgb, vazio(vUv), dentro);
       gl_FragColor = c;
     }
@@ -213,6 +241,55 @@ export class Transcendencia {
     );
     this.raios.renderOrder = 13;
     cena.add(this.raios);
+    // o núcleo forte da estrela-íris (bem branco, atrás da pupila oca)
+    this.nucleoForte = sprite(tex.brilho, '#ffffff', 1, 0);
+    this.nucleoForte.renderOrder = 15;
+    this.nucleoForte.material.depthTest = false;
+    this.auraForte = sprite(tex.brilho, '#d8b4fe', 1, 0);
+    this.auraForte.renderOrder = 15;
+    this.auraForte.material.depthTest = false;
+    cena.add(this.auraForte, this.nucleoForte);
+    // raios compridos e finos saindo do olho transformado
+    const lancas = TRANSCENDER.lancas.map(([graus, comp]) => [THREE.MathUtils.degToRad(graus), comp]);
+    this.uLancas = { uT: { value: 0 }, uCresce: { value: 0 }, uForca: { value: 0 } };
+    this.lancas = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.ShaderMaterial({
+        uniforms: this.uLancas,
+        vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: /* glsl */ `
+          uniform float uT; uniform float uCresce; uniform float uForca; varying vec2 vUv;
+          const int N = ${lancas.length};
+          void main() {
+            vec2 p = (vUv - 0.5) * 6.0; // em larguras do olho
+            float luz = 0.0;
+            ${lancas
+              .map(
+                ([a, comp], k) => `
+            {
+              vec2 d = vec2(${Math.cos(a).toFixed(5)}, ${Math.sin(a).toFixed(5)});
+              float t = dot(p, d);
+              float lado = abs(p.x * d.y - p.y * d.x);
+              float ate = ${comp.toFixed(3)} * uCresce;
+              float trecho = smoothstep(0.42, 0.5, t) * (1.0 - smoothstep(ate * 0.55, ate, t));
+              float brilha = 0.8 + 0.2 * sin(uT * ${(2 + k * 0.7).toFixed(2)} + ${k}.0);
+              luz += (exp(-pow(lado / 0.006, 2.0)) + 0.18 * exp(-pow(lado / 0.03, 2.0))) * trecho * brilha;
+            }`
+              )
+              .join('')}
+            float borda = 1.0 - smoothstep(0.45, 0.5, max(abs(vUv.x - 0.5), abs(vUv.y - 0.5)));
+            gl_FragColor = vec4(vec3(0.9, 0.84, 1.0) * luz * borda * uForca, 1.0);
+          }
+        `,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    this.lancas.renderOrder = 13;
+    this.lancas.visible = false;
+    cena.add(this.lancas);
     this.vazio = new ShaderPass(SHADER_VAZIO);
     composer.insertPass(this.vazio, 3); // logo depois do brilho difuso
     this._v = new THREE.Vector2();
@@ -234,6 +311,7 @@ export class Transcendencia {
     this.proximaOlhada = 0;
     this.alvo = new THREE.Vector2();
     this.fovBase = this.camera.fov;
+    this.veuBase = this.olhos[indice].olho.fundo.material.uniforms.uVeu.value;
   }
 
   /** Tamanho visível (metade da largura e da altura) no plano dos olhos. */
@@ -357,6 +435,11 @@ export class Transcendencia {
     u.uLuzDentro.value = luzDentro;
     u.uIrisLinha.value = 1 - 0.7 * virouEstrela; // (fica um aro fraco em volta da estrela)
     u.uPupilaLinha.value = 1 + 1.6 * virouEstrela; // a borda da pupila oca fica bem clara (como um eclipse)
+    // olho transformado: a pupila vira estrela de 4 pontas, aparece a coroa de pontas e o olho
+    // por dentro fica bem escuro (a estrela da íris se destaca)
+    esc.olho.uIris.uForma.value = smoothstep(0, 0.6, fAbrir);
+    u.uCoroa.value = easeOutCubic(fAbrir);
+    esc.olho.fundo.material.uniforms.uVeu.value = lerp(this.veuBase, 0.9, virouEstrela);
 
     // ---- os outros olhos: olham para o escolhido e somem
     const somem = 1 - smoothstep(0.3, 1.8, s);
@@ -410,15 +493,31 @@ export class Transcendencia {
     const pulsoEstrela = 1 + 0.05 * Math.sin(t * 5.1) + 0.03 * Math.sin(t * 13.7);
     this.estrela.atualizar(t, (tt, out) => out.copy(estrelaPos), {
       visivel: apareceu > 0.001 && fEntrar < 0.999,
-      brilho: 2.5 * apareceu * pulsoEstrela,
+      brilho: 3.4 * apareceu * pulsoEstrela,
       escala: 1,
       tremor: 0,
       raioMalabares: () => escala * apareceu,
       luz: 0,
       rastro: 0,
       limite: 0,
-      escalaVisual: escala * 0.68,
+      escalaVisual: escala * 0.85,
     });
+
+    // núcleo forte e aura da estrela-íris
+    const raioIris = M.raioIris * escala;
+    this.nucleoForte.position.copy(estrelaPos).setZ(1.2);
+    this.nucleoForte.scale.setScalar(raioIris * 1.5 * pulsoEstrela);
+    this.nucleoForte.material.opacity = 0.95 * apareceu;
+    this.auraForte.position.copy(estrelaPos).setZ(1.1);
+    this.auraForte.scale.setScalar(raioIris * 3.2);
+    this.auraForte.material.opacity = 0.35 * apareceu;
+    // raios compridos: saem do olho quando ele abre (crescem rápido) e brilham
+    this.lancas.visible = apareceu > 0.001;
+    this.lancas.position.set(cx, cy, 0.5);
+    this.lancas.scale.setScalar(M.meiaLargura * 2 * escala * 6);
+    this.uLancas.uT.value = t;
+    this.uLancas.uCresce.value = easeOutCubic(clamp(fAbrir * 1.3));
+    this.uLancas.uForca.value = apareceu;
 
     // ---- a pupila oca (e, no fim, o espaço vazio tomando a tela)
     const fenda = esc.olho.uIris.uFenda.value; // (R, d) da fenda agora
@@ -431,6 +530,8 @@ export class Transcendencia {
     vz.uMeio.value.set(meiaLarguraFenda * escala * porAltura * 0.93, meiaAlturaFenda * escala * porAltura * 0.97);
     vz.uAspecto.value = this.camera.aspect;
     vz.uForca.value = smoothstep(0.25, 0.85, fAbrir);
+    vz.uForma.value = esc.olho.uIris.uForma.value;
+    vz.uEstrelaR.value = M.pupilaEstrela.raio * escala * porAltura * 0.93;
     vz.uTudo.value = smoothstep(0.8, 1, fEntrar);
     vz.uPx.value = 1.5 / Math.max(1, innerHeight);
     vz.uT.value = t;
@@ -439,6 +540,11 @@ export class Transcendencia {
     // desenhados (são enormes nessa hora e pesariam à toa)
     const coberto = fEntrar > 0.97;
     esc.olho.grupo.visible = !coberto;
+    this.lancas.visible = this.lancas.visible && !coberto;
+    if (coberto) {
+      this.nucleoForte.material.opacity = 0;
+      this.auraForte.material.opacity = 0;
+    }
     if (coberto) this.estrela.atualizar(t, (tt, out) => out.copy(estrelaPos), { visivel: false });
 
     // ---- 8. vazio
@@ -460,6 +566,9 @@ export class Transcendencia {
       this.feixeFino.material.opacity = 0;
       this.brilhoFresta.material.opacity = 0;
       this.raios.visible = false;
+      this.lancas.visible = false;
+      this.nucleoForte.material.opacity = 0;
+      this.auraForte.material.opacity = 0;
       if (this.elementos.clarao) this.elementos.clarao.style.opacity = '0';
     }
   }
